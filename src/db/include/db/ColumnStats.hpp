@@ -38,6 +38,8 @@ public:
    */
   void addValue(int v);
 
+	int getBucketIndex(int v) const;	
+
   /**
    * Estimate the selectivity of a particular predicate and operand on this table.
    *
@@ -49,7 +51,6 @@ public:
    * @return Predicted selectivity of this particular operator and value
    */
   size_t estimateCardinality(PredicateOp op, int v) const;
-
 
 };
 } // namespace db

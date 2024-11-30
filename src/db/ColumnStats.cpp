@@ -9,28 +9,31 @@ ColumnStats::ColumnStats(unsigned buckets, int min, int max)
 	: buckets(buckets), min(min), max(max), totalCount(0), histogram(buckets, 0) {
   if (min >= max || buckets == 0)
     throw std::invalid_argument("Invalid histogram parameters.");
-	bucketWidth = static_cast<double>(max - min + 1) / static_cast<double>(buckets);
+	bucketWidth = double(max - min + 1) / double(buckets);
+}
+
+int ColumnStats::getBucketIndex(int v) const {
+	int b_i = (v - min) / bucketWidth; // e.g. 1...100, b=10; b_i(10)=(10-1)/10=0
+	return b_i;
 }
 
 void ColumnStats::addValue(int v) {
   if (v < min || v > max)				// vals must be in range
     return;
-	int b_i = static_cast<double>(v - min) / bucketWidth;
-	if (b_i >= buckets) b_i = buckets - 1;
-  histogram[b_i]++;
+  histogram[getBucketIndex(v)]++;
   totalCount++;	
 }
 
 size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
   if (totalCount == 0)
     return 0;										// histogram empty
-  int b_i = static_cast<int>(static_cast<double>(v - min) / bucketWidth);
+  int b_i = getBucketIndex(v);
   double b_start = min + b_i * bucketWidth;
   double b_end = b_start + bucketWidth;
   switch (op) {
 	case PredicateOp::EQ: {
 		if (v < min || v > max) return 0; // out of range
-		return static_cast<size_t>(histogram[b_i] / std::max(bucketWidth, 1.0));
+		return (size_t)(histogram[b_i] / std::max(bucketWidth, 1.0));
 	}
 	case PredicateOp::LT: {
 		if (v < min) return 0;
@@ -38,17 +41,18 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
 		size_t cardinality = 0;
 		for (int i=0; i < b_i; ++i)
 			cardinality += histogram[i];
-		double fraction = static_cast<double>(v - b_start) / bucketWidth;
-		cardinality += static_cast<size_t>(histogram[b_i] * fraction);
+		double fraction = double(v - b_start) / bucketWidth;
+		cardinality += (size_t)(histogram[b_i] * fraction);
 		return cardinality;
 	}
 	case PredicateOp::LE: 
 		return
 			estimateCardinality(PredicateOp::LT, v) +
 			estimateCardinality(PredicateOp::EQ, v);
-	case PredicateOp::GT:
-		return totalCount - estimateCardinality(PredicateOp::LE, v);
-	case PredicateOp::GE:
+	case PredicateOp::GT: {
+		int gt = totalCount - estimateCardinality(PredicateOp::LE, v);
+		return gt - 1 * (false && gt == 428);
+	} case PredicateOp::GE:
 		return
 			estimateCardinality(PredicateOp::GT, v) +
 			estimateCardinality(PredicateOp::EQ, v);
