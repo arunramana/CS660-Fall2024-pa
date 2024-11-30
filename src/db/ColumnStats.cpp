@@ -15,7 +15,7 @@ ColumnStats::ColumnStats(unsigned buckets, int min, int max)
 void ColumnStats::addValue(int v) {
   if (v < min || v > max)				// vals must be in range
     return;
-	unsigned b_i = (v - min) / bucketWidth;
+	int b_i = static_cast<double>(v - min) / bucketWidth;
 	if (b_i >= buckets) b_i = buckets - 1;
   histogram[b_i]++;
   totalCount++;	
@@ -24,13 +24,13 @@ void ColumnStats::addValue(int v) {
 size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
   if (totalCount == 0)
     return 0;										// histogram empty
-  int b_i = static_cast<int>((v - min) / bucketWidth);
+  int b_i = static_cast<int>(static_cast<double>(v - min) / bucketWidth);
   double b_start = min + b_i * bucketWidth;
   double b_end = b_start + bucketWidth;
   switch (op) {
 	case PredicateOp::EQ: {
 		if (v < min || v > max) return 0; // out of range
-		return static_cast<size_t>(histogram[b_i] / bucketWidth);
+		return static_cast<size_t>(histogram[b_i] / std::max(bucketWidth, 1.0));
 	}
 	case PredicateOp::LT: {
 		if (v < min) return 0;
@@ -38,7 +38,7 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
 		size_t cardinality = 0;
 		for (int i=0; i < b_i; ++i)
 			cardinality += histogram[i];
-		double fraction = (v - b_start) / bucketWidth;
+		double fraction = static_cast<double>(v - b_start) / bucketWidth;
 		cardinality += static_cast<size_t>(histogram[b_i] * fraction);
 		return cardinality;
 	}
@@ -47,11 +47,11 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
 			estimateCardinality(PredicateOp::LT, v) +
 			estimateCardinality(PredicateOp::EQ, v);
 	case PredicateOp::GT:
-		return totalCount - estimateCardinality(PredicateOp::LE, v) - 1;
+		return totalCount - estimateCardinality(PredicateOp::LE, v);
 	case PredicateOp::GE:
 		return
 			estimateCardinality(PredicateOp::GT, v) +
-			estimateCardinality(PredicateOp::EQ, v) + 1;
+			estimateCardinality(PredicateOp::EQ, v);
 	case PredicateOp::NE:
 		return totalCount - estimateCardinality(PredicateOp::EQ, v);
 	default:
