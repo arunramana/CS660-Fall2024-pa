@@ -40,7 +40,7 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
       if (v < min) return 0;
       if (v >= max) return totalCount;
       size_t cardinality = 0;
-      for (int i = 0; i < bucketIndex; ++i)
+      for (int i=0; i < bucketIndex; ++i)
         cardinality += histogram[i];
       double fraction = (v - bucketStart) / bucketWidth;
       cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
@@ -49,14 +49,7 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
     case PredicateOp::LE:
       return estimateCardinality(PredicateOp::LT, v + 1);
     case PredicateOp::GT: {
-      if (v > max) return 0;
-      if (v <= min) return totalCount;
-      size_t cardinality = 0;
-      for (int i = bucketIndex + 1; i < static_cast<int>(buckets); ++i)
-        cardinality += histogram[i];
-      double fraction = (bucketEnd - v) / bucketWidth;
-      cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
-      return cardinality;
+			return totalCount - estimateCardinality(PredicateOp::LE, v);
     }
     case PredicateOp::GE:
       return estimateCardinality(PredicateOp::GT, v - 1);
