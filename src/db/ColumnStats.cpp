@@ -9,83 +9,59 @@ ColumnStats::ColumnStats(unsigned buckets, int min, int max)
   if (min >= max || buckets == 0) {
     throw std::invalid_argument("Invalid histogram parameters.");
   }
-  bucketWidth = static_cast<double>(max - min) / buckets;
+  bucketWidth = static_cast<int>(max - min + 1) / buckets;
 }
 
 void ColumnStats::addValue(int v) {
-
-  //check if values are in range
-  if (v < min || v > max) {
+  if (v < min || v > max)				// vals must be in range
     return;
-  }
-
   unsigned bucketIndex = (v - min) / bucketWidth;
   bucketIndex = std::min(bucketIndex, buckets - 1);
-
   histogram[bucketIndex]++;
   totalCount++;
 }
 
 size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
-  if (totalCount == 0) {
-    return 0; // No data in histogram
-  }
-
+  if (totalCount == 0)
+    return 0;										// histogram empty
   int bucketIndex = static_cast<int>((v - min) / bucketWidth);
   double bucketStart = min + bucketIndex * bucketWidth;
   double bucketEnd = bucketStart + bucketWidth;
-
-  // Ensure bucketIndex is within valid range
-  if (bucketIndex < 0) bucketIndex = 0;
-  if (bucketIndex >= static_cast<int>(buckets)) bucketIndex = buckets - 1;
-
+  if (bucketIndex < 0)
+		bucketIndex = 0; // must be valid index
+  if (bucketIndex >= static_cast<int>(buckets))
+		bucketIndex = buckets - 1;
   switch (op) {
     case PredicateOp::EQ: {
-
       if (v < min || v > max) return 0; // Out of range
       return static_cast<size_t>(histogram[bucketIndex] / bucketWidth);
     }
     case PredicateOp::LT: {
       if (v < min) return 0;
       if (v >= max) return totalCount;
-
       size_t cardinality = 0;
-      for (int i = 0; i < bucketIndex; ++i) {
+      for (int i = 0; i < bucketIndex; ++i)
         cardinality += histogram[i];
-      }
-
-
       double fraction = (v - bucketStart) / bucketWidth;
       cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
       return cardinality;
     }
-    case PredicateOp::LE: {
-
+    case PredicateOp::LE:
       return estimateCardinality(PredicateOp::LT, v + 1);
-    }
     case PredicateOp::GT: {
-
       if (v > max) return 0;
       if (v <= min) return totalCount;
-
       size_t cardinality = 0;
-      for (int i = bucketIndex + 1; i < static_cast<int>(buckets); ++i) {
+      for (int i = bucketIndex + 1; i < static_cast<int>(buckets); ++i)
         cardinality += histogram[i];
-      }
-
       double fraction = (bucketEnd - v) / bucketWidth;
       cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
       return cardinality;
     }
-    case PredicateOp::GE: {
-
+    case PredicateOp::GE:
       return estimateCardinality(PredicateOp::GT, v - 1);
-    }
     case PredicateOp::NE: {
-
-      if (v < min || v > max) return totalCount; // All values are not equal
-      size_t equalCardinality = static_cast<size_t>(histogram[bucketIndex] / bucketWidth);
-      return totalCount - equalCardinality;
+			return totalCount - estimateCardinality(PredicateOp::EQ, v);
     }
     default:
       throw std::invalid_argument("Unsupported PredicateOp.");
