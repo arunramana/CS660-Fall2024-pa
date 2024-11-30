@@ -10,6 +10,12 @@ namespace db {
 class ColumnStats {
   // TODO pa4: add private members
 
+ unsigned buckets;                  // Number of buckets
+ int min, max;                      // Min and max values in the range
+ int bucketWidth;                // Width of each bucket
+ size_t totalCount;                 // Total count of all values added
+ std::vector<size_t> histogram;
+
 public:
   /**
    * Create a new ColumnStats.
@@ -45,5 +51,7 @@ public:
    * @return Predicted selectivity of this particular operator and value
    */
   size_t estimateCardinality(PredicateOp op, int v) const;
+
+
 };
 } // namespace db
