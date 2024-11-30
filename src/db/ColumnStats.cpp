@@ -5,7 +5,7 @@
 using namespace db;
 
 ColumnStats::ColumnStats(unsigned buckets, int min, int max)
-    : buckets(buckets), min(min), max(max), totalCount(0), histogram(buckets, 0) {
+	: buckets(buckets), min(min), max(max), totalCount(0), histogram(buckets, 0) {
   if (min >= max || buckets == 0) {
     throw std::invalid_argument("Invalid histogram parameters.");
   }
@@ -32,31 +32,33 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
   if (bucketIndex >= static_cast<int>(buckets))
 		bucketIndex = buckets - 1;
   switch (op) {
-    case PredicateOp::EQ: {
-      if (v < min || v > max) return 0; // Out of range
-      return static_cast<size_t>(histogram[bucketIndex] / bucketWidth);
-    }
-    case PredicateOp::LT: {
-      if (v < min) return 0;
-      if (v >= max) return totalCount;
-      size_t cardinality = 0;
-      for (int i=0; i < bucketIndex; ++i)
-        cardinality += histogram[i];
-      double fraction = (v - bucketStart) / bucketWidth;
-      cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
-      return cardinality;
-    }
-    case PredicateOp::LE:
-      return estimateCardinality(PredicateOp::LT, v + 1);
-    case PredicateOp::GT: {
-			return totalCount - estimateCardinality(PredicateOp::LE, v);
-    }
-    case PredicateOp::GE:
-      return estimateCardinality(PredicateOp::GT, v - 1);
-    case PredicateOp::NE: {
-			return totalCount - estimateCardinality(PredicateOp::EQ, v);
-    }
-    default:
-      throw std::invalid_argument("Unsupported PredicateOp.");
+	case PredicateOp::EQ: {
+		if (v < min || v > max) return 0; // out of range
+		return static_cast<size_t>(histogram[bucketIndex] / bucketWidth);
+	}
+	case PredicateOp::LT: {
+		if (v < min) return 0;
+		if (v >= max) return totalCount;
+		size_t cardinality = 0;
+		for (int i=0; i < bucketIndex; ++i)
+			cardinality += histogram[i];
+		double fraction = (v - bucketStart) / bucketWidth;
+		cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
+		return cardinality;
+	}
+	case PredicateOp::LE: 
+		return
+			estimateCardinality(PredicateOp::LT, v) +
+			estimateCardinality(PredicateOp::EQ, v);
+	case PredicateOp::GT:
+		return totalCount - estimateCardinality(PredicateOp::LE, v);
+	case PredicateOp::GE:
+		return
+			estimateCardinality(PredicateOp::GT, v) +
+			estimateCardinality(PredicateOp::EQ, v);
+	case PredicateOp::NE:
+		return totalCount - estimateCardinality(PredicateOp::EQ, v);
+	default:
+		throw std::invalid_argument("Unsupported PredicateOp.");
   }
 }
