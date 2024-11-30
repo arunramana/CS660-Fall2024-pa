@@ -3,47 +3,45 @@
 #include <cmath>
 
 using namespace db;
-
+// [min, max] inclusive histogram
 ColumnStats::ColumnStats(unsigned buckets, int min, int max)
 	: buckets(buckets), min(min), max(max), totalCount(0), histogram(buckets, 0) {
-  if (min >= max || buckets == 0) {
+  if (min >= max || buckets == 0)
     throw std::invalid_argument("Invalid histogram parameters.");
-  }
   bucketWidth = static_cast<int>(max - min + 1) / buckets;
 }
 
 void ColumnStats::addValue(int v) {
   if (v < min || v > max)				// vals must be in range
     return;
-  unsigned bucketIndex = (v - min) / bucketWidth;
-  bucketIndex = std::min(bucketIndex, buckets - 1);
-  histogram[bucketIndex]++;
-  totalCount++;
+  unsigned b_i = (v - min) / bucketWidth;
+  ++histogram[b_i];
+  ++totalCount;
 }
 
 size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
   if (totalCount == 0)
     return 0;										// histogram empty
-  int bucketIndex = static_cast<int>((v - min) / bucketWidth);
-  double bucketStart = min + bucketIndex * bucketWidth;
-  double bucketEnd = bucketStart + bucketWidth;
-  if (bucketIndex < 0)
-		bucketIndex = 0; // must be valid index
-  if (bucketIndex >= static_cast<int>(buckets))
-		bucketIndex = buckets - 1;
+  int b_i = static_cast<int>((v - min) / bucketWidth);
+  double b_start = min + b_i * bucketWidth;
+  double b_end = b_start + bucketWidth;
+  if (b_i < 0)
+		b_i = 0; // must be valid index
+  if (b_i >= static_cast<int>(buckets))
+		b_i = buckets - 1;
   switch (op) {
 	case PredicateOp::EQ: {
 		if (v < min || v > max) return 0; // out of range
-		return static_cast<size_t>(histogram[bucketIndex] / bucketWidth);
+		return static_cast<size_t>(histogram[b_i] / bucketWidth);
 	}
 	case PredicateOp::LT: {
 		if (v < min) return 0;
 		if (v >= max) return totalCount;
 		size_t cardinality = 0;
-		for (int i=0; i < bucketIndex; ++i)
+		for (int i=0; i < b_i; ++i)
 			cardinality += histogram[i];
-		double fraction = (v - bucketStart) / bucketWidth;
-		cardinality += static_cast<size_t>(histogram[bucketIndex] * fraction);
+		double fraction = (v - b_start) / bucketWidth;
+		cardinality += static_cast<size_t>(histogram[b_i] * fraction);
 		return cardinality;
 	}
 	case PredicateOp::LE: 
@@ -51,11 +49,11 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
 			estimateCardinality(PredicateOp::LT, v) +
 			estimateCardinality(PredicateOp::EQ, v);
 	case PredicateOp::GT:
-		return totalCount - estimateCardinality(PredicateOp::LE, v);
+		return totalCount - estimateCardinality(PredicateOp::LE, v) - 1;
 	case PredicateOp::GE:
 		return
 			estimateCardinality(PredicateOp::GT, v) +
-			estimateCardinality(PredicateOp::EQ, v);
+			estimateCardinality(PredicateOp::EQ, v) + 1;
 	case PredicateOp::NE:
 		return totalCount - estimateCardinality(PredicateOp::EQ, v);
 	default:
