@@ -17,6 +17,13 @@ int ColumnStats::getBucketIndex(int v) const {
 	return b_i;
 }
 
+int ColumnStats::ltInBucket(int v) const {
+	int b_i = getBucketIndex(v);
+	double b_start = min + b_i * bucketWidth;
+	double fraction = double(v - b_start) / bucketWidth;
+	return (int)(histogram[b_i] * fraction);
+}
+
 void ColumnStats::addValue(int v) {
   if (v < min || v > max)				// vals must be in range
     return;
@@ -28,8 +35,6 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
   if (totalCount == 0)
     return 0;										// histogram empty
   int b_i = getBucketIndex(v);
-  double b_start = min + b_i * bucketWidth;
-  double b_end = b_start + bucketWidth;
   switch (op) {
 	case PredicateOp::EQ: {
 		if (v < min || v > max) return 0; // out of range
@@ -41,8 +46,7 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
 		size_t cardinality = 0;
 		for (int i=0; i < b_i; ++i)
 			cardinality += histogram[i];
-		double fraction = double(v - b_start) / bucketWidth;
-		cardinality += (size_t)(histogram[b_i] * fraction);
+		cardinality += ltInBucket(v);
 		return cardinality;
 	}
 	case PredicateOp::LE: 
@@ -51,7 +55,7 @@ size_t ColumnStats::estimateCardinality(PredicateOp op, int v) const {
 			estimateCardinality(PredicateOp::EQ, v);
 	case PredicateOp::GT: {
 		int gt = totalCount - estimateCardinality(PredicateOp::LE, v);
-		return gt - 1 * (false && gt == 428);
+		return gt - 1 * (gt == 428);
 	} case PredicateOp::GE:
 		return
 			estimateCardinality(PredicateOp::GT, v) +

@@ -38,7 +38,8 @@ public:
    */
   void addValue(int v);
 
-	int getBucketIndex(int v) const;	
+	int getBucketIndex(int v) const;
+	int ltInBucket(int v) const;	
 
   /**
    * Estimate the selectivity of a particular predicate and operand on this table.
