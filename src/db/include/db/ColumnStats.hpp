@@ -8,11 +8,9 @@ namespace db {
  * A class to represent a fixed-width histogram over a single integer-based field.
  */
 class ColumnStats {
-  // TODO pa4: add private members
-
  unsigned buckets;                  // Number of buckets
  int min, max;                      // Min and max values in the range
- int bucketWidth;                // Width of each bucket
+ double bucketWidth;                // Width of each bucket
  size_t totalCount;                 // Total count of all values added
  std::vector<size_t> histogram;
 
