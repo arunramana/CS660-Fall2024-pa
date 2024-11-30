@@ -10,7 +10,6 @@ Some of the challenges we faced include:
 1) We were getting getting errors for the following Predicate Operations:
    - LT: Lesser Than
    - GT: Greater Than
-   
 
 2) We also got a Numerical Error due to invalid type conversion from double to int while using bucketWidth
 
